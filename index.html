@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>걸즈밴드파티 툴 모음</title>
+<style>
+  :root{
+    --pink:#ff4081; --pink-d:#e91e63; --bar:#161821; --line:#2a2f3a;
+    --text:#e8eaed; --sub:#9aa0aa;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;overflow:hidden;
+    font-family:'Pretendard','Malgun Gothic',-apple-system,sans-serif;
+    background:#0f1115;}
+
+  /* 상단 탭바 */
+  #tabbar{height:52px;display:flex;align-items:stretch;gap:2px;
+    background:var(--bar);border-bottom:1px solid var(--line);
+    padding:0 8px;position:relative;z-index:10;}
+  #tabbar .brand{display:flex;align-items:center;gap:8px;padding:0 14px 0 6px;
+    font-weight:800;color:var(--pink);font-size:15px;white-space:nowrap;}
+  #tabbar .brand span{font-size:18px;}
+  .tab{appearance:none;border:none;background:transparent;cursor:pointer;
+    color:var(--sub);font-size:14px;font-weight:600;padding:0 18px;
+    display:flex;align-items:center;gap:7px;position:relative;
+    border-radius:10px 10px 0 0;transition:color .15s,background .15s;white-space:nowrap;}
+  .tab:hover{color:var(--text);background:rgba(255,255,255,.04);}
+  .tab.active{color:#fff;}
+  .tab.active::after{content:'';position:absolute;left:12px;right:12px;bottom:0;
+    height:3px;border-radius:3px 3px 0 0;background:linear-gradient(90deg,var(--pink),var(--pink-d));}
+  .tab .dot{width:7px;height:7px;border-radius:50%;background:var(--pink);
+    opacity:0;transition:opacity .2s;}
+  .tab.loading .dot{opacity:1;animation:pulse .9s infinite;}
+  @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+
+  /* iframe 영역 */
+  #stage{position:absolute;top:52px;left:0;right:0;bottom:0;}
+  #stage iframe{position:absolute;inset:0;width:100%;height:100%;
+    border:0;display:none;background:#0f1115;}
+  #stage iframe.show{display:block;}
+
+  @media (max-width:520px){
+    #tabbar .brand span:last-child{display:none;}
+    .tab{padding:0 12px;font-size:13px;}
+  }
+</style>
+</head>
+<body>
+  <div id="tabbar">
+    <div class="brand"><span>🎸</span><span>걸파 툴</span></div>
+    <button class="tab" data-src="rank/index.html">순위분석<i class="dot"></i></button>
+    <button class="tab" data-src="monthly/index.html">월간랭킹<i class="dot"></i></button>
+    <button class="tab" data-src="marina/index.html">마리나불캔<i class="dot"></i></button>
+  </div>
+  <div id="stage"></div>
+
+<script>
+(function(){
+  var tabs  = Array.prototype.slice.call(document.querySelectorAll('.tab'));
+  var stage = document.getElementById('stage');
+  var frames = {};   // src -> iframe (지연 생성 후 재사용)
+
+  function activate(tab){
+    var src = tab.getAttribute('data-src');
+
+    // 지연 로딩: 처음 누를 때만 iframe 생성 → 나머지 탭은 부하 없음
+    if(!frames[src]){
+      var f = document.createElement('iframe');
+      f.setAttribute('loading','lazy');
+      tab.classList.add('loading');
+      f.addEventListener('load', function(){ tab.classList.remove('loading'); });
+      f.src = src;
+      frames[src] = f;
+      stage.appendChild(f);
+    }
+
+    tabs.forEach(function(t){ t.classList.remove('active'); });
+    Object.keys(frames).forEach(function(k){ frames[k].classList.remove('show'); });
+    tab.classList.add('active');
+    frames[src].classList.add('show');
+
+    // 딥링크: #rank / #monthly / #marina
+    var id = src.split('/')[0];
+    if(location.hash !== '#'+id) history.replaceState(null,'','#'+id);
+  }
+
+  tabs.forEach(function(t){
+    t.addEventListener('click', function(){ activate(t); });
+  });
+
+  // 첫 진입: 해시가 있으면 그 탭, 없으면 순위분석(첫 탭)만 로드
+  var hash = (location.hash||'').replace('#','');
+  var start = tabs.filter(function(t){ return t.getAttribute('data-src').split('/')[0]===hash; })[0] || tabs[0];
+  activate(start);
+})();
+</script>
+</body>
+</html>

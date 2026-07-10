@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>마리나 교환소 불캔 확률 계산기</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            position: relative;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 1200px;
+            width: 100%;
+            backdrop-filter: blur(10px);
+        }
+
+        .help-btn {
+            position: absolute;
+            top: 30px;
+            right: 40px;
+            text-decoration: none;
+            color: #667eea;
+            font-weight: 700;
+            font-size: 0.9em;
+            padding: 8px 16px;
+            border: 2px solid #667eea;
+            border-radius: 20px;
+            transition: all 0.3s ease;
+            background: transparent;
+        }
+
+        .help-btn:hover {
+            background: #667eea;
+            color: white;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .content-wrapper {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            align-items: start;
+        }
+
+        @media (max-width: 768px) {
+            .content-wrapper {
+                grid-template-columns: 1fr;
+            }
+            
+            .help-btn {
+                position: static;
+                display: block;
+                width: fit-content;
+                margin: 0 auto 15px auto;
+                text-align: center;
+            }
+
+            .container {
+                padding: 30px 20px;
+            }
+        }
+
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+            grid-column: 1 / -1;
+        }
+
+        .left-panel, .right-panel {
+            width: 100%;
+        }
+
+        .input-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-reset {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            margin-top: 10px;
+        }
+
+        .btn-reset:hover {
+            box-shadow: 0 10px 25px rgba(245, 87, 108, 0.4);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .button-group .btn {
+            margin-top: 0;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 25px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-item {
+            margin: 12px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            color: #333;
+            font-size: 0.95em;
+        }
+
+        .result-item strong {
+            color: #667eea;
+        }
+
+        .conclusion {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 1.2em;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.02);
+            }
+        }
+
+        .conclusion.continue {
+            background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+            color: #047857;
+        }
+
+        .conclusion.stop {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: #c2410c;
+        }
+
+        .small-text {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .input-hint {
+            font-size: 0.75em;
+            color: #888;
+            margin-top: 4px;
+            font-style: italic;
+        }
+
+        .stage-info {
+            background: #fff3cd;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            color: #856404;
+            text-align: center;
+        }
+
+        .footer {
+            text-align: right;
+            margin-top: 20px;
+            font-size: 0.75em;
+            color: #999;
+            font-style: italic;
+        }
+
+        .mode-selector {
+            display: flex;
+            background: #e0e0e0;
+            border-radius: 10px;
+            padding: 5px;
+            margin-bottom: 25px;
+        }
+
+        .mode-option {
+            flex: 1;
+            text-align: center;
+        }
+
+        .mode-option input {
+            display: none;
+        }
+
+        .mode-option span {
+            display: block;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .mode-option input:checked + span {
+            background: #667eea;
+            color: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="https://gall.dcinside.com/mgallery/board/view?id=bang_dream&no=5727788" target="_blank" class="help-btn">사용방법</a>
+
+        <h1>🔥 마리나 교환소 불캔 확률 계산기</h1>
+        
+        <div class="content-wrapper">
+            <div class="left-panel">
+                <div class="stage-info">
+                    💡 스테이지를 입력하지 않으면 자동으로 6단계로 계산됩니다
+                </div>
+
+                <form id="calcForm">
+                    <div class="input-group">
+                        <label>이벤트 모드 선택</label>
+                        <div class="mode-selector">
+                            <label class="mode-option">
+                                <input type="radio" name="mode" value="vs" checked>
+                                <span>대반</span>
+                            </label>
+                            <label class="mode-option">
+                                <input type="radio" name="mode" value="team">
+                                <span>팀대반</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="bc_now">현재 불캔 개수</label>
+                        <input type="number" id="bc_now" required min="0" placeholder="예: 8">
+                        <div class="input-hint">こほうび箱の中身 터치 후 남아있는 불캔 개수</div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="nkr">현재 아이템 개수</label>
+                        <input type="number" id="nkr" required min="1" placeholder="예: 142">
+                        <div class="input-hint">残り: n/N 에서의 n을 입력 // '계산하기' 버튼을 누르면 자동으로 10씩 줄어듭니다.</div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="stage">스테이지 (선택사항)</label>
+                        <input type="number" id="stage" min="1" max="6" placeholder="1-6 (기본값: 6)">
+                        <div class="small-text" id="prob-display"></div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn">계산하기</button>
+                        <button type="button" class="btn btn-reset" id="resetBtn">초기화</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="right-panel">
+                <div class="result" id="result">
+                    <div class="result-item">
+                        <strong>선택 모드:</strong> <span id="r_mode"></span>
+                    </div>
+                    <div class="result-item">
+                        <strong>현재 불캔 개수:</strong> <span id="r_bc_now"></span>
+                    </div>
+                    <div class="result-item">
+                        <strong>현재 아이템 개수:</strong> <span id="r_nkr"></span>
+                    </div>
+                    <div class="result-item">
+                        <strong>현재 확률:</strong> <span id="r_current_prob"></span>
+                    </div>
+                    <div class="result-item">
+                        <strong>일반적인 확률:</strong> <span id="r_general_prob"></span>
+                    </div>
+                    <div class="result-item">
+                        <strong>시행 여부:</strong> <span id="r_decision"></span>
+                    </div>
+                    <div class="conclusion" id="conclusion"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            made by Bangbung Kim
+        </div>
+    </div>
+
+    <script>
+        // 확률 데이터 정의
+        const EP_TEAM = [3/40, 5/65, 5/90, 5/160, 5/220, 10/230];
+        const EP_VS = [3/40, 5/50, 10/70, 10/120, 10/170, 10/180];
+        
+        const probDisplay = document.getElementById('prob-display');
+        const modeInputs = document.querySelectorAll('input[name="mode"]');
+
+        // 숫자 입력창 클릭 시 전체 선택 기능
+        const numberInputs = document.querySelectorAll('input[type="number"]');
+        numberInputs.forEach(input => {
+            input.addEventListener('focus', function() {
+                this.select();
+                setTimeout(() => { this.select(); }, 0);
+            });
+        });
+
+        // 확률 정보 업데이트 함수
+        function updateProbDisplay() {
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            const currentEP = mode === 'team' ? EP_TEAM : EP_VS;
+            
+            const html = currentEP.map((v, i) => `${i+1}단계 (${(v * 100).toFixed(2)}%)`).join(', ');
+            probDisplay.textContent = html;
+        }
+
+        // 초기 로드시 확률 정보 표시
+        updateProbDisplay();
+
+        // 모드 변경시 확률 정보 업데이트 이벤트 리스너
+        modeInputs.forEach(input => {
+            input.addEventListener('change', updateProbDisplay);
+        });
+
+        document.getElementById('calcForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            // 입력값 가져오기
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            const bc_now = parseInt(document.getElementById('bc_now').value);
+            const nkr = parseInt(document.getElementById('nkr').value);
+            let stage = parseInt(document.getElementById('stage').value);
+
+            // 스테이지 유효성 검사 (기본값 6)
+            if (isNaN(stage) || stage < 1 || stage > 6) {
+                stage = 6;
+            }
+
+            // 확률 배열 선택
+            const currentEP = mode === 'team' ? EP_TEAM : EP_VS;
+
+            // 계산
+            const current_prob = bc_now / nkr;
+            const general_prob = currentEP[stage - 1]; // 0-based index
+            const decision = current_prob >= general_prob;
+
+            // 결과 표시
+            document.getElementById('r_mode').textContent = mode === 'team' ? '팀대반' : '대반';
+            document.getElementById('r_bc_now').textContent = bc_now;
+            document.getElementById('r_nkr').textContent = nkr;
+            document.getElementById('r_current_prob').textContent = (current_prob * 100).toFixed(2) + '%';
+            document.getElementById('r_general_prob').textContent = (general_prob * 100).toFixed(2) + '%';
+            
+            const decisionSpan = document.getElementById('r_decision');
+            if (decision) {
+                decisionSpan.textContent = '✓ 예 (높음)';
+                decisionSpan.style.color = '#047857';
+                decisionSpan.style.fontWeight = 'bold';
+            } else {
+                decisionSpan.textContent = '✗ 아니오 (낮음)';
+                decisionSpan.style.color = '#c2410c';
+                decisionSpan.style.fontWeight = 'bold';
+            }
+
+            const conclusionDiv = document.getElementById('conclusion');
+            if (decision) {
+                conclusionDiv.textContent = '🎯 계속 돌려!';
+                conclusionDiv.className = 'conclusion continue';
+            } else {
+                conclusionDiv.textContent = '➡️ 다음으로 넘어가';
+                conclusionDiv.className = 'conclusion stop';
+            }
+
+            document.getElementById('result').style.display = 'block';
+
+            // 계산 후 현재 아이템 개수에서 10 차감 (대반, 팀대반 모두 적용)
+            const nkrInput = document.getElementById('nkr');
+            const newNkr = parseInt(nkrInput.value) - 10;
+            nkrInput.value = newNkr > 0 ? newNkr : 0;
+        });
+
+        // [수정된 부분] 초기화 버튼 클릭 시 숫자 입력칸만 비우기
+        document.getElementById('resetBtn').addEventListener('click', function() {
+            // 전체 폼 리셋(reset()) 대신 각 숫자 입력칸을 수동으로 비웁니다.
+            // 이렇게 하면 라디오 버튼(대반/팀대반) 선택 상태는 유지됩니다.
+            document.getElementById('bc_now').value = '';
+            document.getElementById('nkr').value = '';
+            document.getElementById('stage').value = '';
+
+            // 결과창 숨기기
+            document.getElementById('result').style.display = 'none';
+            
+            // 편의를 위해 첫 번째 입력칸에 포커스
+            document.getElementById('bc_now').focus();
+        });
+    </script>
+</body>
+</html>

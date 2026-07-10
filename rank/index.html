@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>걸파 순위 예측</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --pink:#e91e63; --pink-l:#ff6fa5; --bg:#0f1115; --panel:#181b22;
+    --card:#1e222b; --line:#2a2f3a; --text:#e8eaed; --sub:#9aa0aa;
+    --good:#26c281; --blue:#42a5f5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 70% -10%, #241726, var(--bg));
+       color:var(--text);font-family:'Pretendard','Malgun Gothic',sans-serif;}
+  .wrap{max-width:1080px;margin:0 auto;padding:30px 18px 80px;}
+  header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}
+  header h1{font-size:1.6em;margin:0;background:linear-gradient(90deg,#ff6fa5,#e91e63);
+       -webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800;}
+  .ev{color:var(--sub);font-size:.92em;}
+  .ev b{color:var(--text);}
+  .badge{display:inline-block;background:var(--panel);border:1px solid var(--line);
+       border-radius:999px;padding:3px 11px;font-size:.78em;color:var(--sub);margin-left:4px;}
+  .hint{color:var(--sub);font-size:.8em;margin-top:4px;}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;
+       padding:20px 22px;margin:20px 0;box-shadow:0 12px 40px rgba(0,0,0,.35);}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;align-items:end;}
+  label{display:block;font-size:.82em;color:var(--sub);margin-bottom:7px;}
+  input[type=text]{width:100%;background:#11141a;border:1px solid var(--line);color:var(--text);
+       border-radius:11px;padding:12px 13px;font-size:1.05em;outline:none;transition:.15s;}
+  input[type=text]:focus{border-color:var(--pink);box-shadow:0 0 0 3px rgba(233,30,99,.18);}
+  .ranks{display:flex;gap:8px;flex-wrap:wrap;}
+  .chip{user-select:none;cursor:pointer;border:1px solid var(--line);background:#11141a;
+       color:var(--sub);border-radius:11px;padding:11px 14px;font-size:.95em;transition:.15s;}
+  .chip.on{background:var(--pink);border-color:var(--pink);color:#fff;font-weight:700;}
+
+  #out{display:flex;flex-direction:column;gap:24px;margin-top:22px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;
+       box-shadow:0 10px 30px rgba(0,0,0,.3);animation:rise .4s ease both;}
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  .chead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:15px 20px;
+       background:linear-gradient(90deg,rgba(233,30,99,.16),transparent);border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  .chead .t{font-size:1.3em;font-weight:800;}
+  .chead .t small{color:var(--sub);font-weight:500;font-size:.6em;margin-left:8px;}
+  .cbody{padding:18px 20px 22px;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px;}
+  .kpi{background:#161a21;border:1px solid var(--line);border-left:4px solid var(--pink);
+       border-radius:12px;padding:13px 14px;}
+  .kpi .l{font-size:.76em;color:var(--sub);margin-bottom:6px;}
+  .kpi .v{font-size:1.4em;font-weight:800;letter-spacing:.3px;}
+  .kpi .s{font-size:.73em;color:var(--sub);margin-top:5px;}
+  .kpi.hero{background:linear-gradient(180deg,rgba(233,30,99,.14),#161a21);}
+  .kpi.hero .v{color:var(--pink-l);}
+  .chartbox{position:relative;width:100%;height:420px;background:#12151c;
+       border:1px solid var(--line);border-radius:14px;padding:10px 12px 6px;}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.82em;color:var(--sub);margin:10px 2px 0;}
+  .legend i{display:inline-block;width:18px;height:0;border-top-width:3px;border-top-style:solid;
+       vertical-align:middle;margin-right:6px;}
+  .legend .sw{display:inline-block;width:14px;height:12px;border-radius:3px;vertical-align:middle;margin-right:6px;}
+  .det{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:18px;}
+  .det div{background:#161a21;border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
+  .det .l{font-size:.74em;color:var(--sub);margin-bottom:4px;}
+  .det .v{font-size:1.0em;font-weight:700;}
+  .err{background:#3a1620;border:1px solid #6e2233;color:#ffb3c4;padding:14px 18px;border-radius:12px;}
+  .foot{color:var(--sub);text-align:center;margin-top:40px;font-size:.82em;}
+  @media(max-width:600px){.chartbox{height:320px;}.kpi .v{font-size:1.2em;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>걸파 순위 예측</h1>
+    <span class="ev" id="evinfo">불러오는 중…</span>
+  </header>
+  <div class="hint" id="meta"></div>
+
+  <div class="panel">
+    <div class="grid">
+      <div>
+        <label>현재 내 점수</label>
+        <input type="text" id="score" inputmode="numeric" placeholder="예: 2,500,000">
+      </div>
+      <div>
+        <label>판당 점수</label>
+        <input type="text" id="pandang" inputmode="numeric" value="20,000">
+      </div>
+      <div>
+        <label>판당 소요(분)</label>
+        <input type="text" id="mpg" inputmode="decimal" value="3">
+      </div>
+      <div>
+        <label>목표 순위</label>
+        <div class="ranks" id="ranks"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="out"></div>
+  <div class="foot">BanG Dream! Event Predictor · Gradient Boosting (티어+타입) · 자동 갱신</div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const fmt = n => Number(Math.round(n)).toLocaleString();
+function clean(el){ return parseInt((el.value||'').replace(/[^0-9.]/g,''))||0; }
+const charts=[]; let DATA=null;
+const LS='garupa_rank_cfg';
+
+function loadCfg(){ try{return JSON.parse(localStorage.getItem(LS))||{}}catch(e){return {}} }
+function saveCfg(){ localStorage.setItem(LS, JSON.stringify({
+  score:clean($('#score')), pandang:clean($('#pandang')), mpg:$('#mpg').value,
+  ranks:[...document.querySelectorAll('#ranks .chip.on')].map(c=>+c.dataset.r)
+})); }
+
+['score','pandang'].forEach(id=>{
+  const el=$('#'+id);
+  el.addEventListener('input',()=>{
+    const c=el.value.replace(/[^0-9]/g,''); el.value=c?Number(c).toLocaleString():'';
+    render();
+  });
+});
+$('#mpg').addEventListener('input',render);
+
+function fmtTime(min){
+  min=Math.round(min); const d=Math.floor(min/1440),h=Math.floor((min%1440)/60),m=min%60;
+  return d>0?`${d}일 ${h}시간`:`${h}시간 ${m}분`;
+}
+
+// 진단(불캔/시간/판수) — 브라우저에서 사용자 입력으로 즉시 계산
+function diagnose(f, score, pandang, mpg, endStr){
+  const now=new Date(), end=new Date(endStr.replace(' ','T'));
+  const remDays=Math.max(0,(end-now)/86400000);
+  const remSec=Math.max(0,(end-now)/1000);
+  const target=f.ub;
+  const togo=Math.max(0,target-score);
+  const games=pandang>0?togo/pandang:0;
+  const minutes=games*mpg, flames=games*3, natural=35*remDays;
+  return {remDays, togo, games:Math.floor(games), minutes,
+    flames_to_buy:Math.max(0,Math.floor(flames-natural)), natural:Math.floor(natural),
+    max_final:Math.floor(score+(remSec/(mpg*60))*pandang)};
+}
+
+const refLines={id:'refLines',afterDatasetsDraw(chart,_,opts){
+  const {ctx,chartArea:{top,bottom},scales:{x,y}}=chart;
+  if(opts.pNow!=null){const px=x.getPixelForValue(opts.pNow);
+    ctx.save();ctx.setLineDash([5,4]);ctx.strokeStyle='#26c281';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(px,top);ctx.lineTo(px,bottom);ctx.stroke();
+    ctx.setLineDash([]);ctx.fillStyle='#26c281';ctx.font='11px sans-serif';ctx.fillText('지금',px+4,top+12);ctx.restore();}
+  if(opts.score>0){const py=y.getPixelForValue(opts.score);
+    if(py>=top&&py<=bottom){ctx.save();ctx.setLineDash([6,4]);ctx.strokeStyle='#f9a825';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(x.left,py);ctx.lineTo(x.right,py);ctx.stroke();
+      ctx.setLineDash([]);ctx.fillStyle='#f9a825';ctx.font='11px sans-serif';ctx.fillText('내 점수',x.left+4,py-4);ctx.restore();}}
+}};
+const crosshair={id:'crosshair',afterDraw(chart){
+  const a=chart.tooltip?._active;
+  if(a&&a.length){const {ctx,chartArea:{top,bottom}}=chart;const px=a[0].element.x;
+    ctx.save();ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(px,top);ctx.lineTo(px,bottom);ctx.stroke();ctx.restore();}
+}};
+
+function makeChart(canvas, ch, score){
+  const xs=[...new Set([].concat(ch.observed,ch.mean,ch.lb,ch.ub).map(p=>p[0]))].sort((a,b)=>a-b);
+  const align=arr=>{const m=new Map(arr.map(p=>[p[0],p[1]]));return xs.map(x=>({x,y:m.has(x)?m.get(x):null}));};
+  const data={datasets:[
+    {label:'예측 하한',data:align(ch.lb),borderColor:'transparent',pointRadius:0,fill:false,tension:.25,spanGaps:false,order:5},
+    {label:'예측 구간',data:align(ch.ub),borderColor:'transparent',backgroundColor:'rgba(66,165,245,.18)',pointRadius:0,fill:'-1',tension:.25,spanGaps:false,order:5},
+    {label:'현재 실측',data:align(ch.observed),borderColor:'#ffffff',borderWidth:2.4,pointRadius:0,fill:false,tension:.15,spanGaps:false,order:1},
+    {label:'예측(점추정)',data:align(ch.mean),borderColor:'#ff6fa5',borderWidth:2.4,borderDash:[7,5],pointRadius:0,fill:false,tension:.25,spanGaps:false,order:2},
+  ]};
+  return new Chart(canvas,{type:'line',data,options:{
+    responsive:true,maintainAspectRatio:false,animation:{duration:400},
+    interaction:{mode:'index',intersect:false},
+    scales:{
+      x:{type:'linear',min:0,max:100,title:{display:true,text:'이벤트 진행도 (%)',color:'#9aa0aa'},
+         grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#9aa0aa',callback:v=>v+'%'}},
+      y:{title:{display:true,text:'컷라인 점수',color:'#9aa0aa'},grid:{color:'rgba(255,255,255,.05)'},
+         ticks:{color:'#9aa0aa',callback:v=>v>=1e6?(v/1e6).toFixed(1)+'M':(v/1e3).toFixed(0)+'k'}}},
+    plugins:{legend:{display:false},refLines:{pNow:ch.p_now,score:score},
+      tooltip:{backgroundColor:'#222732',borderColor:'#2a2f3a',borderWidth:1,padding:10,callbacks:{
+        title:items=>'진행도 '+(items[0]?.parsed.x??0).toFixed(1)+'%',
+        label:c=>{if(c.dataset.label==='예측 하한'||c.parsed.y==null)return null;
+          const nm=c.dataset.label==='예측 구간'?'안전 상한':c.dataset.label;return nm+': '+fmt(c.parsed.y);}}}}
+  },plugins:[refLines,crosshair]});
+}
+
+function card(tier, f, score, pandang, mpg, idx){
+  const d=diagnose(f,score,pandang,mpg,DATA.event.end);
+  const reached=f.ub-score<=0;
+  return `<div class="card"><div class="chead">
+    <div class="t">IN ${tier} <small>현재컷 ${fmt(f.current_value)} · 진행도 ${DATA.progress.toFixed(1)}%</small></div>
+    <div class="ev">학습 ${f.n_train}개 (${f.pool})</div></div>
+    <div class="cbody"><div class="kpis">
+      <div class="kpi hero"><div class="l">예측 컷라인 (안전 ≈89%)</div><div class="v">${fmt(f.ub)}</div>
+        <div class="s">점추정 ${fmt(f.mean)} · 구간 ${fmt(f.lb)}~${fmt(f.ub)}</div></div>
+      <div class="kpi"><div class="l">남은 목표 (TOGO)</div>
+        <div class="v">${reached?'<span style="color:var(--good)">도달 ✓</span>':fmt(d.togo)}</div><div class="s">안전컷 − 내 점수</div></div>
+      <div class="kpi"><div class="l">필요 불캔 (구매)</div>
+        <div class="v">${reached?0:d.flames_to_buy} <span style="font-size:.5em">개</span></div><div class="s">자연불 ${d.natural}개 제외</div></div>
+      <div class="kpi"><div class="l">필요 시간 / 판수</div>
+        <div class="v">${reached?'-':fmtTime(d.minutes)}</div><div class="s">${reached?0:fmt(d.games)} 판</div></div>
+    </div>
+    <div class="chartbox"><canvas id="cv${idx}"></canvas></div>
+    <div class="legend">
+      <span><i style="border-color:#ffffff"></i>현재 실측</span>
+      <span><i style="border-color:#ff6fa5;border-top-style:dashed"></i>예측(점추정)</span>
+      <span><span class="sw" style="background:rgba(66,165,245,.35)"></span>예측 구간(하한~안전)</span>
+      <span><i style="border-color:#26c281;border-top-style:dashed"></i>현재 시점</span>
+      <span><i style="border-color:#f9a825;border-top-style:dashed"></i>내 점수</span></div>
+    <div class="det">
+      <div><div class="l">현재 컷라인</div><div class="v">${fmt(f.current_value)}</div></div>
+      <div><div class="l">예측 점추정</div><div class="v">${fmt(f.mean)}</div></div>
+      <div><div class="l">예측 하한</div><div class="v">${fmt(f.lb)}</div></div>
+      <div><div class="l">안전 컷라인</div><div class="v" style="color:var(--pink-l)">${fmt(f.ub)}</div></div>
+      <div><div class="l">남은 기간</div><div class="v">${d.remDays.toFixed(2)}일</div></div>
+      <div><div class="l">풀오토 가능 점수</div><div class="v">${fmt(d.max_final)}</div></div>
+    </div></div></div>`;
+}
+
+function render(){
+  if(!DATA) return;
+  saveCfg();
+  const score=clean($('#score')), pandang=clean($('#pandang'))||20000, mpg=parseFloat($('#mpg').value)||3;
+  const ranks=[...document.querySelectorAll('#ranks .chip.on')].map(c=>+c.dataset.r).sort((a,b)=>a-b);
+  charts.forEach(c=>c.destroy()); charts.length=0;
+  if(!ranks.length){ $('#out').innerHTML='<div class="err">목표 순위를 하나 이상 선택하세요.</div>'; return; }
+  const avail=ranks.filter(r=>DATA.tiers[r]);
+  $('#out').innerHTML=avail.map((r,i)=>card(r,DATA.tiers[r],score,pandang,mpg,i)).join('');
+  avail.forEach((r,i)=>charts.push(makeChart(document.getElementById('cv'+i),DATA.tiers[r].chart,score)));
+}
+
+async function init(){
+  const cfg=loadCfg();
+  if(cfg.score) $('#score').value=Number(cfg.score).toLocaleString();
+  if(cfg.pandang) $('#pandang').value=Number(cfg.pandang).toLocaleString();
+  if(cfg.mpg) $('#mpg').value=cfg.mpg;
+  try{
+    DATA=await (await fetch('data.json?_='+Date.now())).json();
+  }catch(e){ $('#out').innerHTML='<div class="err">data.json 을 불러오지 못했습니다. (아직 생성 전이거나 경로 문제)</div>'; return; }
+  const e=DATA.event;
+  $('#evinfo').innerHTML=`<b>${e.id}회</b> · ${e.name} <span class="badge">${e.band}</span><span class="badge">${e.type}</span><span class="badge">종료 ${e.end}</span>`;
+  $('#meta').textContent=`과거 ${DATA.n_history}개 곡선(같은 타입 우선) 학습 · 안전컷 ≈89% 신뢰 · 마지막 갱신 ${DATA.generated.replace('T',' ')}`;
+  // 순위 칩 생성
+  const tiers=Object.keys(DATA.tiers).map(Number).sort((a,b)=>a-b);
+  const sel=new Set(cfg.ranks&&cfg.ranks.length?cfg.ranks:[500,1000]);
+  $('#ranks').innerHTML=tiers.map(t=>`<div class="chip ${sel.has(t)?'on':''}" data-r="${t}">IN ${t}</div>`).join('');
+  $('#ranks').addEventListener('click',ev=>{ if(ev.target.classList.contains('chip')){ev.target.classList.toggle('on');render();}});
+  render();
+  // 진행도/남은시간 표시는 분 단위로 갱신
+  setInterval(render, 60000);
+}
+init();
+</script>
+</body>
+</html>
