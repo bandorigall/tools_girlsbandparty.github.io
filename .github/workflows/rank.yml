@@ -1,0 +1,44 @@
+name: rank-train
+
+# 순위분석: 하루 1회 현재 이벤트 fetch + 모델 학습/예측 → rank/data.json 갱신
+on:
+  schedule:
+    - cron: '0 15 * * *'      # 매일 00:00 KST (UTC 15:00)
+  workflow_dispatch:          # 수동 실행 버튼
+
+permissions:
+  contents: write
+
+concurrency:                  # 겹쳐 돌지 않게(부하/충돌 방지)
+  group: rank-train
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install deps
+        run: pip install -r rank/requirements.txt
+
+      - name: Build data.json
+        working-directory: rank
+        run: python build_data.py
+
+      - name: Commit if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- rank/data.json; then
+            git add rank/data.json
+            git commit -m "chore(rank): auto-update data.json [skip ci]"
+            git push
+          else
+            echo "변경 없음 — 커밋 생략"
+          fi
