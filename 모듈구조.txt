@@ -1,0 +1,121 @@
+================================================================
+걸즈밴드파티 (tools_girlsbandparty.github.io) — 모듈 구조 (기술 명세)
+================================================================
+
+0. 개요
+  걸파(뱅드림 걸즈밴드파티) 계산·예측 도구 3종을 한 사이트로 묶은 탭 허브.
+  탭: [순위분석 / 월간랭킹 / 마리나불캔]. 각 탭은 하위 폴더의 독립 정적
+  페이지를 iframe 으로 격리 로드한다(전체 페이지 CSS/JS 충돌 회피 + 부하분산).
+  핵심 도구는 rank(순위분석): 진행 중 이벤트를 실시간 fetch → 티어별 최종
+  컷라인 예측. GitHub Actions 가 매일 학습/예측하여 rank/data.json 갱신.
+  배포: GitHub Pages(정적). rank 만 Actions 자동화, monthly/marina 는 순수 정적.
+
+1. 디렉토리 구성
+  index.html                  탭 허브(상단 탭바 + iframe 지연 로딩, 딥링크 #rank 등).
+  git_auto.sh                 add→commit→pull→push 자동화 스크립트.
+  .gitignore                  __pycache__, *.pyc, rank/experiment/, *.log.
+  rank/                       순위 예측 도구(자동화 대상).
+    index.html                정적 프런트(rank/data.json 읽어 Chart.js 렌더).
+    build_data.py             Actions 진입점: fetch→예측→data.json 저장.
+    predictor.py              예측 코어(SurgePredictor: 티어별 GBM).
+    get_events.py             Bestdori API 이벤트 메타 조회(밴드/타입/기간).
+    curves.npz                과거 이벤트 정규화 곡선 캐시(학습 데이터, ~510KB).
+    data.json                 산출물(Actions 갱신). 현재 이벤트 예측 결과.
+    requirements.txt          bestdori-api, httpx, scikit-learn, pandas, numpy.
+  monthly/index.html          월간랭킹 계산기(정적, 舊 월간랭킹 레포 이관).
+  marina/index.html           마리나 교환소 불캔 확률 계산기(정적, 舊 마리나불캔 이관).
+  .github/workflows/rank.yml  일 1회(00:00 KST) + 수동 트리거 학습/예측/커밋.
+
+2. 허브 (index.html)
+  - 상단 탭바 3개. 각 탭 button 에 data-src 로 하위 index.html 경로 지정.
+  - 지연 로딩: 탭 최초 클릭 시에만 iframe 생성 후 frames{} 캐시에 보관·재사용.
+    첫 진입 시 첫 탭(rank)만 로드 → 나머지는 클릭 전까지 네트워크/렌더 부하 0.
+  - 딥링크: location.hash(#rank/#monthly/#marina)로 진입 탭 결정,
+    탭 전환 시 history.replaceState 로 해시 동기화.
+  - 반응형: 520px 이하에서 탭 패딩 축소, 브랜드 텍스트 일부 숨김.
+
+3. 순위 예측 코어 (rank/predictor.py :: class SurgePredictor)
+  3.1 데이터 표현
+      - GRID = np.linspace(0,100,201): 진행도 0~100%를 0.5% 간격 201점 이산화.
+      - 각 (이벤트, 티어) 곡선 = 진행도 그리드 위 컷라인 값. 관측은
+        np.maximum.accumulate 로 단조 증가 보정.
+      - 과거 곡선은 curves.npz 에서 로드(CACHE_DIR). 진행 중 이벤트는 실시간 fetch.
+  3.2 특징 (features, 관측 시점 i_obs 기준, 5차원)
+      [ 진행도 p,
+        log(현재값 v),
+        최근 10% 구간 기울기 / v,
+        최근 5% 구간 기울기 / v,
+        진행 50% 시점 값 / 현재값 ]
+  3.3 학습 풀 (_training_rows)
+      같은 티어 + 같은 이벤트 타입(메들리/트라이/대반 등) 우선.
+      타입 일치 표본 < MIN_TYPE_SAMPLES(=15) 이면 같은 티어 전체로 폴백.
+      (백테스트상 밴드 필터는 표본만 깎여 악화 → 미사용.)
+  3.4 회귀 목표 / 모델
+      목표 y = log(최종컷 / 현재컷).
+      관측 시점 i_obs 마다 GradientBoostingRegressor 적합.
+      GBM_KW = n_estimators=120, max_depth=2, learning_rate=0.05,
+               subsample=0.8, random_state=0.
+        - 평균(mean): 기본 loss.
+        - 상한(ub, 안전컷): loss="quantile", alpha=ALPHA_UB=0.95.
+        - 하한(lb):        loss="quantile", alpha=ALPHA_LB=0.10.
+      (tier, type, i_obs, alpha) 조합별로 모델을 요청 내 캐시.
+  3.5 예측 (forecast)
+      현재 부분 곡선(current_partial: EventTracker 실측 컷 시계열 → 진행도
+      그리드 보간, np.interp)에서 시점 특징 f0 추출.
+      예측값 = v * exp(model.predict(f0)). 단조 보정(lb ≤ mean ≤ ub, 모두 현재값
+      이상). 사용한 학습 풀은 pool 문자열로 기록.
+      _chart_data: 같은 풀의 평균 '형태'를 현재값 기준으로 투영해 예측 곡선 생성.
+      관측점 observed / 미래 투영 proj_mean·proj_lb·proj_ub 를 [진행도,값] 쌍
+      리스트로 산출(future index 는 i_obs 부터 2칸 간격, 마지막 점 포함).
+  3.6 진단 (diagnose)
+      안전컷(ub) 도달에 필요한 판수/시간/불캔(자연 회복 35/일 차감) 및
+      남은 기간 내 최대 도달 가능 점수 산출.
+  검증(LOO 백테스트, 진행 85~95%): naive 막판오차 19.7% vs GBM 2.7%,
+  안전컷(α=0.95) 실제 커버리지 ≈ 89%.
+
+4. 이벤트 메타 (rank/get_events.py)
+  - bestdori.events.get_all() 로 전체 이벤트 조회.
+  - identifyBand: 캐릭터 ID 집합 → 밴드명(포피파/앱글/하로하피/파스파레/로젤리아 …).
+  - eventType 한글 매핑: medley→메들리, festival→팀라이브, live_try→트라이,
+    versus→대반, challenge→챌린지, mission_live→미션.
+  - startAt/endAt(ms) → KST(+9h) 변환, 5분 반올림.
+  ※ 신규 밴드/타입 추가 시 이 매핑을 갱신해야 함.
+
+5. 빌드 / 자동화 (rank/build_data.py + .github/workflows/rank.yml)
+  5.1 build_data.py
+      - P.CACHE_DIR = HERE 로 지정(curves.npz 를 rank/ 에서 로드).
+      - SurgePredictor 로드 → 현재 이벤트 fetch(call_events) →
+        TIERS = [100, 500, 1000, 2000] 각각 예측 →
+        data.json 저장. 키: generated, event, progress, n_history, tiers.
+  5.2 rank.yml
+      트리거: cron '0 15 * * *'(=00:00 KST) + workflow_dispatch(수동).
+      permissions: contents: write. concurrency group 'rank-train'
+      (cancel-in-progress) 로 중복 실행 방지.
+      스텝: checkout@v4 → setup-python@v5(3.11, pip 캐시) →
+            pip install -r rank/requirements.txt →
+            (working-directory: rank) python build_data.py →
+            rank/data.json 변경 시에만 commit&push, 메시지에 [skip ci].
+
+6. 프런트 (rank/index.html)
+  - Chart.js(4.4.1, CDN) 사용. fetch('data.json?_=<ts>') 로 산출물 로드.
+  - 티어별 현재컷 / 예측(평균·안전컷·하한) KPI + 예측 곡선 렌더.
+  - 런타임 학습 없음: 예측은 Actions 가 미리 계산, 프런트는 순수 표시.
+  - data.json 미존재 시 안내 메시지 표시(생성 전/경로 문제 대비).
+
+7. 구 레포 리다이렉트 (이 레포 밖, 참고)
+  - marinafirecan.github.io / monthly_ranking_calculator.github.io 의 index.html 을
+    리다이렉트 스텁으로 교체: JS location.replace + meta refresh(3s) + canonical
+    + 수동 링크 → 각각 이 허브의 #marina / #monthly 로 유도.
+
+8. 설계 결정 / 제약
+  - iframe 격리: 3개 도구의 전역 CSS/JS 가 충돌하므로 단일 DOM 병합 대신 격리.
+    부수 효과로 탭별 지연 로딩(부하분산)도 확보.
+  - 정적 호스팅 + Actions 배치: 브라우저에서 무거운 모델 학습을 피하고
+    하루 1회 서버측 갱신으로 data.json 만 정적 서빙(트래픽 무관, CDN 확장).
+  - 예측 방식: 막판 급주를 naive/외삽이 과소예측 → 과거 다수 이벤트에서
+    log 배율을 직접 회귀(GBM)로 교체(구 GAM+ARIMA 대비 개선).
+  - 학습 데이터(curves.npz) 동봉 → Actions 가 과거 재수집 없이 현재만 fetch.
+  - 의존성 함정: bestdori-api 는 httpx/aiohttp 를 자동 설치하지 않으므로
+    requirements.txt 에 httpx 를 반드시 명시(누락 시 Actions 에서 ImportError).
+  - 권한: 워크플로 파일 로컬 push 에는 git 토큰 workflow 스코프 필요.
+    tksqhddnfl5 계정은 bandorigall 레포 admin 이 아니라 dispatch 불가(로그만 열람).
