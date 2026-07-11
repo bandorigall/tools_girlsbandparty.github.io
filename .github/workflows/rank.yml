@@ -1,9 +1,9 @@
 name: rank-train
 
-# 순위분석: 하루 1회 현재 이벤트 fetch + 모델 학습/예측 → rank/data.json 갱신
+# 순위분석: 1시간마다 현재 이벤트 fetch + 모델 학습/예측 → rank/data.json 갱신
 on:
   schedule:
-    - cron: '0 15 * * *'      # 매일 00:00 KST (UTC 15:00)
+    - cron: '0 * * * *'       # 매시 정각 (하루 24회)
   workflow_dispatch:          # 수동 실행 버튼
 
 permissions:
