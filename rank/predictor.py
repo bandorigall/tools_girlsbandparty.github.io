@@ -140,7 +140,7 @@ class SurgePredictor:
         total = (end_ts - start_ts).total_seconds()
         if total <= 0:
             return None
-        now = pd.Timestamp(now) if now is not None else pd.Timestamp.now()
+        now = pd.Timestamp(now) if now is not None else pd.Timestamp.now(tz="Asia/Seoul").tz_localize(None)
         p_now = (now - start_ts).total_seconds() / total * 100.0
         p_now = float(np.clip(p_now, 0.5, 100))
         i_now = idx_at(p_now)
@@ -270,7 +270,7 @@ class SurgePredictor:
 def diagnose(forecast, current_score, end_time, score_per_game,
              minutes_per_game=3, natural_flames_per_day=35, current_cutline=None):
     end = pd.to_datetime(end_time)
-    now = pd.Timestamp.now()
+    now = pd.Timestamp.now(tz="Asia/Seoul").tz_localize(None)
     remaining_days = max(0.0, (end - now).total_seconds() / 86400)
 
     target = forecast["ub"]  # 안전컷 기준
