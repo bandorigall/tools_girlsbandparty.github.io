@@ -240,7 +240,7 @@ async function init(){
   }catch(e){ $('#out').innerHTML='<div class="err">data.json 을 불러오지 못했습니다. (아직 생성 전이거나 경로 문제)</div>'; return; }
   const e=DATA.event;
   $('#evinfo').innerHTML=`<b>${e.id}회</b> · ${e.name} <span class="badge">${e.band}</span><span class="badge">${e.type}</span><span class="badge">종료 ${e.end}</span>`;
-  $('#meta').textContent=`과거 ${DATA.n_history}개 곡선(같은 타입 우선) 학습 · 안전컷 ≈89% 신뢰 · 마지막 갱신 ${DATA.generated.replace('T',' ')}`;
+  $('#meta').textContent=`과거 ${DATA.n_history}개 곡선(같은 타입 우선) 학습 · 안전컷 ≈89% 신뢰 · 마지막 갱신 ${DATA.generated.replace('T',' ')} (KST)`;
   // 순위 칩 생성
   const tiers=Object.keys(DATA.tiers).map(Number).sort((a,b)=>a-b);
   const sel=new Set(cfg.ranks&&cfg.ranks.length?cfg.ranks:[500,1000]);

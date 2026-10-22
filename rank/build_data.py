@@ -28,7 +28,7 @@ def main():
     eid = int(cur["id"])
 
     out = {
-        "generated": datetime.datetime.now().isoformat(timespec="seconds"),
+        "generated": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).replace(tzinfo=None).isoformat(timespec="seconds"),
         "event": {
             "id": eid,
             "name": str(cur["eventName"]),
